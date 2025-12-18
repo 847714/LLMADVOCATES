@@ -3,52 +3,25 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import Logo from './Logo';
 
-// Comprehensive Structured Legal Knowledge Base
 const OFFLINE_ACTS_DB: Record<string, { title: string, sections: string[] }> = {
   "BNS": {
     title: "Bharatiya Nyaya Sanhita, 2023",
-    sections: [
-      "Sec 4-13: Punishments and Commutation",
-      "Sec 14-44: General Exceptions",
-      "Sec 63-73: Sexual Offences",
-      "Sec 100-113: Offences affecting Life",
-      "Sec 303-313: Theft, Snatching, Robbery",
-      "Sec 356: Defamation"
-    ]
+    sections: ["Sec 4-13: Punishments", "Sec 14-44: Exceptions", "Sec 63-73: Sexual Offences", "Sec 100-113: Offences affecting Life"]
   },
   "BNSS": {
     title: "Bharatiya Nagarik Suraksha Sanhita, 2023",
-    sections: [
-      "Sec 35-62: Arrest of Persons",
-      "Sec 173-196: FIR and Investigation",
-      "Sec 478-496: Bail and Bonds"
-    ]
+    sections: ["Sec 35-62: Arrest", "Sec 173-196: FIR", "Sec 478-496: Bail"]
   },
   "BSA": {
     title: "Bharatiya Sakshya Adhiniyam, 2023",
-    sections: [
-      "Sec 15-25: Admissions and Confessions",
-      "Sec 61: Electronic Records",
-      "Sec 104-120: Burden of Proof"
-    ]
-  },
-  "CONSTITUTION": {
-    title: "The Constitution of India",
-    sections: [
-      "Art 14-18: Right to Equality",
-      "Art 21: Right to Life & Liberty",
-      "Art 32/226: Writ Jurisdictions"
-    ]
+    sections: ["Sec 61: Electronic Records", "Sec 104: Burden of Proof"]
   }
 };
 
 const AIAssistant: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { 
-      role: 'assistant', 
-      text: 'Greetings! I am LLM Advocate, your expert legal companion. I am fully loaded with the Arrangement of Sections for BNS, BNSS, BSA, and the Constitution. How can I serve you today?' 
-    }
+    { role: 'assistant', text: 'Greetings. I am your specialized Tech-Legal companion. I can provide insights on Indian Statutes, ISO 42001, and AI Governance. How may I assist?' }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -70,21 +43,15 @@ const AIAssistant: React.FC = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isLoading]);
 
   const searchLocalDB = (query: string) => {
     const q = query.toUpperCase();
-    if (q.includes("CONTACT") || q.includes("EMAIL") || q.includes("HIRE")) {
-      return "To reach our advocates, please email deepakkhohalcod@gmail.com directly.";
-    }
-
-    let foundActs: string[] = [];
+    let found = [];
     for (const key in OFFLINE_ACTS_DB) {
-      if (q.includes(key) || OFFLINE_ACTS_DB[key].title.toUpperCase().includes(q)) {
-        foundActs.push(`${OFFLINE_ACTS_DB[key].title}:\n${OFFLINE_ACTS_DB[key].sections.join('\n')}`);
-      }
+      if (q.includes(key)) found.push(`${OFFLINE_ACTS_DB[key].title}:\n${OFFLINE_ACTS_DB[key].sections.join('\n')}`);
     }
-    return foundActs.length > 0 ? foundActs.join('\n\n') : "Please specify an Act (BNS, BSA, etc.) or connect to the internet for a deep AI analysis.";
+    return found.length > 0 ? found.join('\n\n') : "I am currently limited in offline mode. Please connect to the internet for deep legal reasoning using Gemini Pro.";
   };
 
   const handleSend = async () => {
@@ -97,106 +64,99 @@ const AIAssistant: React.FC = () => {
 
     if (!isOnline) {
       setTimeout(() => {
-        const localResponse = searchLocalDB(input);
-        setMessages(prev => [...prev, { role: 'assistant', text: localResponse }]);
+        setMessages(prev => [...prev, { role: 'assistant', text: searchLocalDB(input) }]);
         setIsLoading(false);
-      }, 600);
+      }, 500);
       return;
     }
 
     try {
+      // Guideline: Create instance right before making the call
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3-pro-preview',
         contents: input,
         config: {
-          systemInstruction: `You are 'LLM Advocate', the official AI Legal Assistant for LLM Advocates. Speak with authority, provide Bare Act references, and avoid formatting characters like asterisks. Email: deepakkhohalcod@gmail.com.`,
-          temperature: 0.4,
+          systemInstruction: "You are 'LLM Advocate AI', a high-end legal intelligence assistant for LLM Advocates. Provide authoritative, concise legal information based on Indian law (BNS, BNSS, BSA, IT Act) and AI Governance (ISO 42001). Do not provide legal advice, only informational summaries. Avoid markdown formatting like asterisks. Email contact: deepakkhohalcod@gmail.com.",
+          temperature: 0.3,
+          thinkingConfig: { thinkingBudget: 4000 }
         },
       });
 
-      const cleanText = (response.text || "Service error.").replace(/\*/g, '');
-      setMessages(prev => [...prev, { role: 'assistant', text: cleanText }]);
+      const textOutput = response.text || "I encountered a technical hurdle. Please try again.";
+      setMessages(prev => [...prev, { role: 'assistant', text: textOutput.replace(/\*/g, '') }]);
     } catch (error) {
-      const localFallback = searchLocalDB(input);
-      setMessages(prev => [...prev, { role: 'assistant', text: `Connection Issue. Local DB Results:\n\n${localFallback}` }]);
+      console.error("AI Error:", error);
+      setMessages(prev => [...prev, { role: 'assistant', text: "Service temporarily unavailable. Our advocates are available at deepakkhohalcod@gmail.com." }]);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-[100]">
+    <div className="fixed bottom-6 right-6 z-[200]">
       {isOpen ? (
-        <div className="w-80 md:w-96 h-[550px] bg-carbon border border-yellow-400/40 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
-          {/* Header with Logo */}
-          <div className="bg-yellow-400 p-4 flex justify-between items-center shadow-lg">
+        <div className="w-[90vw] md:w-96 h-[600px] bg-obsidian border border-yellow-400/30 rounded-3xl shadow-[0_0_80px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden animate-in zoom-in duration-300">
+          <div className="bg-yellow-400 p-5 flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-12 h-12 bg-black rounded-full border-2 border-black flex items-center justify-center overflow-hidden shadow-inner">
-                  <Logo size={32} glow={false} />
-                </div>
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-yellow-400 animate-pulse"></div>
+              <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center">
+                <Logo size={24} glow={false} variant="standard" />
               </div>
               <div>
-                <span className="font-bold text-black block leading-none text-lg">LLM Advocate</span>
-                <span className="text-[9px] text-black/70 font-mono font-bold uppercase tracking-widest">
-                  {isOnline ? 'Active AI Support' : 'Offline Mode Active'}
-                </span>
+                <h4 className="font-black text-black text-sm uppercase tracking-tighter leading-none">Legal AI Engine</h4>
+                <p className="text-[9px] text-black/60 font-bold tracking-widest uppercase">{isOnline ? 'Gemini 3 Pro Active' : 'Offline Knowledge Base'}</p>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="text-black hover:scale-110 transition-transform p-2 bg-black/5 rounded-lg">
-              <i className="fas fa-times text-xl"></i>
+            <button onClick={() => setIsOpen(false)} className="w-8 h-8 rounded-full hover:bg-black/10 transition-colors">
+              <i className="fas fa-times text-black"></i>
             </button>
           </div>
           
-          {/* Chat Window */}
-          <div ref={scrollRef} className="flex-grow p-4 overflow-y-auto space-y-6 bg-obsidian/40 custom-scrollbar">
+          <div ref={scrollRef} className="flex-grow p-5 overflow-y-auto space-y-6 custom-scrollbar bg-[radial-gradient(circle_at_top_right,#1a1a1a_0%,#050505_100%)]">
             {messages.map((m, i) => (
-              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start items-end gap-2'}`}>
+              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start items-start gap-3'}`}>
                 {m.role === 'assistant' && (
-                  <div className="w-8 h-8 rounded-full bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center shrink-0 mb-1">
-                    <Logo size={20} glow={false} />
+                  <div className="w-8 h-8 rounded-lg bg-yellow-400/5 border border-yellow-400/20 flex items-center justify-center shrink-0 mt-1">
+                    <Logo size={16} glow={false} />
                   </div>
                 )}
-                <div className={`max-w-[80%] p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${
+                <div className={`max-w-[85%] p-4 rounded-2xl text-xs md:text-sm leading-relaxed ${
                   m.role === 'user' 
-                    ? 'bg-yellow-400 text-black rounded-tr-none font-medium' 
-                    : 'bg-carbon border border-white/5 text-slate-300 rounded-bl-none'
+                    ? 'bg-yellow-400 text-black font-bold rounded-tr-none shadow-xl shadow-yellow-400/10' 
+                    : 'bg-carbon/50 border border-white/5 text-slate-300 rounded-tl-none'
                 }`}>
                   {m.text}
                 </div>
               </div>
             ))}
             {isLoading && (
-              <div className="flex justify-start items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center shrink-0">
-                  <Logo size={20} glow={false} className="animate-pulse" />
+              <div className="flex justify-start gap-3 items-center">
+                <div className="w-8 h-8 rounded-lg bg-yellow-400/10 flex items-center justify-center animate-pulse">
+                  <Logo size={16} glow={false} />
                 </div>
-                <div className="bg-carbon border border-white/5 p-3 rounded-xl rounded-bl-none flex gap-1.5 items-center">
+                <div className="flex gap-1">
                   <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-bounce"></div>
-                  <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-bounce [animation-delay:-0.2s]"></div>
-                  <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-bounce [animation-delay:-0.4s]"></div>
+                  <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                  <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
                 </div>
               </div>
             )}
           </div>
           
-          {/* Input Area */}
-          <div className="p-4 border-t border-white/5 bg-obsidian/60 flex gap-2">
+          <div className="p-4 bg-carbon/80 border-t border-white/5 flex gap-2">
             <input 
               type="text" 
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder={isOnline ? "Ask about BNS, Writs, or Hire us..." : "BNS/BNSS Search..."} 
-              className="flex-grow bg-carbon border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-yellow-400/50 transition-all placeholder:text-slate-600"
+              placeholder="Query Statutes or AI Governance..." 
+              className="flex-grow bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-yellow-400/50 transition-all"
               disabled={isLoading}
             />
             <button 
               onClick={handleSend} 
               disabled={isLoading}
-              className={`bg-yellow-400 text-black w-12 h-12 rounded-xl flex items-center justify-center transition-all ${isLoading ? 'opacity-50' : 'hover:scale-105 active:scale-95 shadow-lg'}`}
+              className="bg-yellow-400 text-black w-12 h-12 rounded-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg"
             >
               <i className="fas fa-paper-plane"></i>
             </button>
@@ -205,13 +165,10 @@ const AIAssistant: React.FC = () => {
       ) : (
         <button 
           onClick={() => setIsOpen(true)}
-          className="w-16 h-16 bg-yellow-400 rounded-full flex items-center justify-center shadow-[0_10px_40px_rgba(250,204,21,0.4)] hover:scale-110 transition-transform group relative border-4 border-obsidian overflow-hidden"
+          className="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center shadow-[0_15px_40px_rgba(250,204,21,0.3)] hover:scale-110 hover:-rotate-3 transition-all group relative border border-white/10 overflow-hidden"
         >
-          <Logo size={40} variant="black" className="group-hover:rotate-12 transition-transform" />
-          <div className="absolute top-0 right-0 flex h-4 w-4">
-             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-             <span className="relative inline-flex rounded-full h-4 w-4 bg-white border-2 border-obsidian"></span>
-          </div>
+          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+          <Logo size={32} variant="black" />
         </button>
       )}
     </div>
